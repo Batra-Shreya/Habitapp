@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Habitat — Grow good habits, together</title>
+  <meta name="description" content="A friendly habit tracker that rewards you for hitting your goals and lets you cheer on a friend." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>" />
+</head>
+<body>
+  <!-- Onboarding / name capture -->
+  <div id="onboarding" class="onboarding hidden" aria-hidden="true">
+    <div class="onboarding-card">
+      <div class="onboarding-emoji">🌱</div>
+      <h1>Welcome to Habitat</h1>
+      <p>Grow good habits, earn rewards, and cheer on a friend. What should we call you?</p>
+      <form id="onboarding-form" autocomplete="off">
+        <input id="onboarding-name" type="text" maxlength="24" placeholder="Your name" required />
+        <button type="submit" class="btn btn-primary btn-block">Let's grow 🌿</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-logo">🌱</span>
+        <div>
+          <div class="brand-name">Habitat</div>
+          <div class="brand-tagline">grow good habits, together</div>
+        </div>
+      </div>
+      <div class="header-user">
+        <div class="header-stats">
+          <div class="chip chip-level" title="Your level">
+            <span class="chip-icon">⭐</span>
+            <span>Lvl <b id="hdr-level">1</b></span>
+          </div>
+          <div class="chip chip-points" title="Total points earned">
+            <span class="chip-icon">💎</span>
+            <span><b id="hdr-points">0</b> pts</span>
+          </div>
+        </div>
+        <div class="avatar" id="hdr-avatar" title="That's you!">🙂</div>
+      </div>
+    </header>
+
+    <!-- Level progress bar -->
+    <div class="level-bar-wrap">
+      <div class="level-bar">
+        <div class="level-bar-fill" id="level-bar-fill"></div>
+      </div>
+      <div class="level-bar-label" id="level-bar-label">0 / 100 to next level</div>
+    </div>
+
+    <!-- Tabs -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="today" role="tab">🗓️ Today</button>
+      <button class="tab" data-tab="progress" role="tab">📈 Progress</button>
+      <button class="tab" data-tab="rewards" role="tab">🏆 Rewards</button>
+      <button class="tab" data-tab="buddy" role="tab">🤝 Buddy</button>
+    </nav>
+
+    <main class="app-main">
+      <!-- TODAY -->
+      <section class="panel active" id="panel-today">
+        <div class="panel-head">
+          <div>
+            <h2 id="today-greeting">Hey there 👋</h2>
+            <p class="muted" id="today-date"></p>
+          </div>
+          <button class="btn btn-primary" id="add-habit-btn">＋ New goal</button>
+        </div>
+
+        <div class="today-summary" id="today-summary"></div>
+
+        <ul class="habit-list" id="habit-list"></ul>
+
+        <div class="empty-state hidden" id="habits-empty">
+          <div class="empty-emoji">🌱</div>
+          <h3>No habits yet</h3>
+          <p>Add your first goal and start your streak today.</p>
+          <button class="btn btn-primary" id="add-habit-empty">＋ Create a goal</button>
+        </div>
+      </section>
+
+      <!-- PROGRESS -->
+      <section class="panel" id="panel-progress">
+        <div class="panel-head"><h2>Your progress 📈</h2></div>
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="card">
+          <h3 class="card-title">Last 30 days</h3>
+          <p class="muted small">Each square is a day. Greener = more habits completed.</p>
+          <div class="heatmap" id="heatmap"></div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Per-habit streaks</h3>
+          <div id="habit-streaks"></div>
+        </div>
+      </section>
+
+      <!-- REWARDS -->
+      <section class="panel" id="panel-rewards">
+        <div class="panel-head"><h2>Rewards & achievements 🏆</h2></div>
+        <div class="card reward-hero">
+          <div class="reward-hero-left">
+            <div class="reward-level">⭐ Level <span id="reward-level">1</span></div>
+            <div class="reward-title" id="reward-title">Sprout</div>
+          </div>
+          <div class="reward-hero-right">
+            <div class="reward-points"><b id="reward-points">0</b><span>points</span></div>
+          </div>
+        </div>
+        <h3 class="section-label">Badges</h3>
+        <div class="badge-grid" id="badge-grid"></div>
+      </section>
+
+      <!-- BUDDY -->
+      <section class="panel" id="panel-buddy">
+        <div class="panel-head"><h2>Accountability buddy 🤝</h2></div>
+
+        <div class="card buddy-share">
+          <h3 class="card-title">1 · Share your progress</h3>
+          <p class="muted small">Copy your code and send it to your friend so they can cheer you on.</p>
+          <div class="share-row">
+            <textarea id="my-code" class="code-box" readonly rows="2"></textarea>
+            <button class="btn btn-primary" id="copy-code-btn">Copy code</button>
+          </div>
+        </div>
+
+        <div class="card buddy-import">
+          <h3 class="card-title">2 · Add your buddy's progress</h3>
+          <p class="muted small">Paste the code your friend sent you.</p>
+          <div class="share-row">
+            <textarea id="buddy-code-input" class="code-box" rows="2" placeholder="Paste your buddy's code here…"></textarea>
+            <button class="btn btn-primary" id="import-code-btn">Add buddy</button>
+          </div>
+          <div id="import-msg" class="import-msg"></div>
+        </div>
+
+        <div id="buddy-view" class="hidden">
+          <div class="card buddy-card">
+            <div class="buddy-head">
+              <div class="avatar avatar-lg" id="buddy-avatar">🙂</div>
+              <div>
+                <div class="buddy-name" id="buddy-name">Your buddy</div>
+                <div class="muted small" id="buddy-sub"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="remove-buddy-btn">Remove</button>
+            </div>
+            <div class="buddy-stats" id="buddy-stats"></div>
+            <div class="buddy-cheer">
+              <button class="btn btn-cheer" data-cheer="👏 Keep going!">👏 Keep going!</button>
+              <button class="btn btn-cheer" data-cheer="🔥 You're on fire!">🔥 On fire!</button>
+              <button class="btn btn-cheer" data-cheer="💪 Proud of you!">💪 Proud of you!</button>
+            </div>
+            <div id="cheer-msg" class="cheer-msg"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>Made for you & your friend · <button class="link-btn" id="reset-btn">reset all data</button></span>
+    </footer>
+  </div>
+
+  <!-- Add / edit habit modal -->
+  <div class="modal-overlay hidden" id="habit-modal">
+    <div class="modal">
+      <h3 id="modal-title">New goal</h3>
+      <form id="habit-form" autocomplete="off">
+        <label class="field">
+          <span>Goal name</span>
+          <input id="habit-name" type="text" maxlength="40" placeholder="e.g. Drink 2L water" required />
+        </label>
+        <label class="field">
+          <span>Pick an icon</span>
+          <div class="emoji-picker" id="emoji-picker"></div>
+          <input type="hidden" id="habit-emoji" value="💧" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modal-save">Save goal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Celebration layer -->
+  <div class="celebrate hidden" id="celebrate">
+    <canvas id="confetti-canvas"></canvas>
+    <div class="celebrate-msg" id="celebrate-msg"></div>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
