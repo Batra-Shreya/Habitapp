@@ -5,7 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "node --watch server/server.js"
+    "dev": "node --watch server/server.js",
+    "test": "node test/api.test.js",
+    "check": "node --check server/server.js && node --check server/store.js && node --check public/app.js && node --check public/api.js"
   },
   "engines": {
     "node": ">=18"
