@@ -1,0 +1,85 @@
+"use strict";
+
+/* Tiny JSON-file store. Good enough for a small self-hosted buddy app:
+   no native deps, atomic writes, and everything held in memory for fast reads. */
+
+const fs = require("fs");
+const path = require("path");
+
+const DB_PATH = process.env.HABITAT_DB || path.join(__dirname, "db.json");
+
+function emptyDb() {
+  return {
+    users: {},   // key: lowercased username -> { id, name, passHash, salt, state, snapshot, buddyName, updatedAt }
+    tokens: {},  // token -> lowercased username
+  };
+}
+
+let db = emptyDb();
+
+function loadFromDisk() {
+  try {
+    const raw = fs.readFileSync(DB_PATH, "utf8");
+    db = Object.assign(emptyDb(), JSON.parse(raw));
+  } catch {
+    db = emptyDb();
+  }
+  return db;
+}
+
+let writeTimer = null;
+function persist() {
+  // Debounced atomic write: write to a temp file then rename.
+  if (writeTimer) return;
+  writeTimer = setTimeout(() => {
+    writeTimer = null;
+    try {
+      const tmp = DB_PATH + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+      fs.renameSync(tmp, DB_PATH);
+    } catch (err) {
+      console.error("[store] failed to persist:", err.message);
+    }
+  }, 120);
+}
+
+function key(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+module.exports = {
+  DB_PATH,
+  init() { return loadFromDisk(); },
+  raw() { return db; },
+  key,
+
+  getUser(name) { return db.users[key(name)] || null; },
+  userExists(name) { return !!db.users[key(name)]; },
+
+  putUser(user) {
+    db.users[key(user.name)] = user;
+    persist();
+    return user;
+  },
+
+  setToken(token, name) {
+    db.tokens[token] = key(name);
+    persist();
+  },
+  userForToken(token) {
+    const k = db.tokens[token];
+    return k ? db.users[k] || null : null;
+  },
+  clearToken(token) {
+    delete db.tokens[token];
+    persist();
+  },
+
+  // Everyone who has picked `name` as their buddy (i.e. is watching them).
+  watchersOf(name) {
+    const k = key(name);
+    return Object.values(db.users).filter(u => key(u.buddyName) === k);
+  },
+
+  persist,
+};

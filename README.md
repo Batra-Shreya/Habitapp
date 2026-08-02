@@ -1,65 +1,101 @@
 # 🌱 Habitat — grow good habits, together
 
 A small, friendly habit tracker that **rewards you for hitting your goals** and lets you
-**pair up with a friend** to keep each other motivated. No sign-up, no server, no build
-step — just open it and start.
+**pair up with a friend** and see each other's progress **update live**. Runs on a tiny
+Node backend with **zero npm dependencies** — no build step, no database server.
 
-![built with vanilla JS](https://img.shields.io/badge/built%20with-vanilla%20JS-4ade80)
+![node](https://img.shields.io/badge/node-%E2%89%A518-4ade80) ![deps](https://img.shields.io/badge/dependencies-0-22c55e)
 
 ## What it does
 
 - **🗓️ Track daily goals** — add habits like "Drink water" or "Read 20 min" and check them off each day.
 - **🏆 Get rewarded** — every completion earns points, builds streaks, levels you up, and unlocks badges.
-- **🎉 Celebrate wins** — confetti and a little cheer every time you complete a goal.
+- **🎉 Celebrate wins** — confetti and a cheer every time you complete a goal.
 - **📈 See progress** — streaks, a 30-day heatmap, and completion stats.
-- **🤝 Team up with a friend** — share a code with your buddy, add theirs, see each other's
-  progress side-by-side, and send encouragement.
+- **🤝 Live accountability buddy** — add a friend by username and watch their points, streak, and
+  online status update **in real time**. Send **live cheers** that pop up on their screen instantly.
 
-## How to run it
+## Run it
 
-It's a plain web app — no install needed.
+You need [Node.js](https://nodejs.org) 18 or newer. There's nothing to install.
 
 ```bash
-# Option 1: just open it
-open index.html          # macOS
-xdg-open index.html      # Linux
-start index.html         # Windows
-
-# Option 2: serve it (nicer for clipboard copy features)
-python3 -m http.server 8000
-# then visit http://localhost:8000
+npm start
+# → 🌱 Habitat is running at http://localhost:3000
 ```
 
-## How the buddy system works
+Open **http://localhost:3000**, create an account (username + passcode), and you're in.
 
-Because there's no backend, friends sync through **share codes**:
+> Want to see the live buddy sync right now? Open the URL in **two different browsers**
+> (or a normal + private window), sign up as two people, add each other by username, and
+> check off a habit in one — watch it update in the other instantly.
 
-1. Go to the **🤝 Buddy** tab and copy **your code**.
-2. Send it to your friend (text, DM, anywhere).
-3. Paste **their code** into the "Add your buddy" box.
-4. You'll each see the other's points, best streak, and completions — and can send cheers.
+`npm run dev` runs the same thing with auto-restart on file changes.
 
-Re-copy and re-share your code whenever you want your buddy to see fresh progress.
+## How the live buddy system works
+
+1. Go to the **🤝 Buddy** tab and share **your username** with your friend.
+2. Each of you enters the **other's username** under "Add your buddy."
+3. That's it — you'll each see the other's points, best streak, completions, and a green
+   **online** dot, all updating live. Tap a cheer button to send instant encouragement.
+
+Under the hood the browser holds an open **Server-Sent Events** stream to the backend. When
+you save progress or send a cheer, the server pushes it straight to anyone watching you.
+
+## Architecture
+
+```
+public/            ← the frontend (static, no build)
+  index.html
+  styles.css
+  app.js           ← app logic: goals, scoring, streaks, badges, confetti, live buddy UI
+  api.js           ← thin client for the backend (auth, sync, SSE)
+server/
+  server.js        ← pure-Node HTTP server: static files, auth, REST, SSE
+  store.js         ← JSON-file persistence (atomic writes)
+  db.json          ← created at runtime (git-ignored)
+package.json       ← just `npm start`; no dependencies
+```
+
+**Backend API** (all JSON):
+
+| Method & path        | Auth | Purpose                                        |
+|----------------------|------|------------------------------------------------|
+| `POST /api/signup`   | –    | Create an account, returns a token             |
+| `POST /api/login`    | –    | Log in, returns a token + saved state          |
+| `GET  /api/state`    | ✔    | Load your saved goals/points                   |
+| `PUT  /api/state`    | ✔    | Save your state (pushes updates to your buddy) |
+| `GET  /api/buddy`    | ✔    | Your buddy's current snapshot                  |
+| `POST /api/buddy`    | ✔    | Add a buddy by username                        |
+| `DELETE /api/buddy`  | ✔    | Remove your buddy                              |
+| `POST /api/cheer`    | ✔    | Send a live cheer to your buddy                |
+| `GET  /api/events`   | ✔    | SSE stream of live buddy + cheer events        |
+
+Auth is a bearer token (stored in the browser). Passcodes are hashed with `scrypt`; nothing is
+sent in plaintext to storage.
+
+## Works offline too
+
+If you open the app without a running backend (e.g. `public/index.html` straight from disk), it
+drops into **solo mode**: you can still track your own goals and earn rewards, saved in your
+browser's `localStorage`. The live-buddy features simply light up once you're on an account.
+
+## Playing together over the internet
+
+Local `npm start` is perfect for one machine or a home network. For you and a friend on
+different networks, run the server somewhere you both can reach:
+
+- **Quick share:** run `npm start`, then expose it with a tunnel like
+  `npx localtunnel --port 3000` or `ngrok http 3000`, and send your friend the URL.
+- **Always-on:** deploy `server/` to any Node host (Render, Railway, Fly.io, a small VPS).
+  It's a single process; point it at a persistent disk for `server/db.json`.
+  Configure the port with the `PORT` env var and the data file with `HABITAT_DB`.
 
 ## Your data
 
-Everything is stored locally in your browser (`localStorage`) under the key `habitat.v1`.
-Nothing is uploaded anywhere. Use **reset all data** in the footer to wipe it.
-
-## Project structure
-
-```
-index.html   — markup & screens
-styles.css   — all styling (dark, responsive)
-app.js       — state, scoring, streaks, badges, buddy codes, confetti
-```
-
-## Want real-time friend sync later?
-
-The share-code approach keeps this zero-setup. To make buddies update live, you'd add a
-small backend (e.g. Firebase, Supabase, or a tiny Node + SQLite API) and replace the
-`mySnapshot()` / `decodeSnapshot()` flow in `app.js` with fetch calls. The data model
-(`user`, `habits`, `history`, `points`, `badges`) is already shaped for that.
+Accounts and progress live in `server/db.json` on whatever machine runs the server. In solo
+mode, data stays in your browser only. Use **reset all data** in the footer to clear the
+device, or **log out** to switch accounts.
 
 ---
 

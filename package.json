@@ -1,0 +1,14 @@
+{
+  "name": "habitat",
+  "version": "1.0.0",
+  "description": "A friendly habit tracker with rewards and a live accountability buddy. Zero dependencies.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

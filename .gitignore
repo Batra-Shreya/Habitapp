@@ -5,7 +5,11 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Node (only if you later add tooling)
+# Node
 node_modules/
 npm-debug.log*
 dist/
+
+# Local backend data (created at runtime)
+server/db.json
+server/db.json.tmp

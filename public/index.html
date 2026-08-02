@@ -15,11 +15,20 @@
     <div class="onboarding-card">
       <div class="onboarding-emoji">🌱</div>
       <h1>Welcome to Habitat</h1>
-      <p>Grow good habits, earn rewards, and cheer on a friend. What should we call you?</p>
+      <p id="onboarding-sub">Grow good habits, earn rewards, and cheer on a friend in real time.</p>
+
+      <div class="seg" id="auth-seg">
+        <button type="button" class="seg-btn active" data-mode="signup">Create account</button>
+        <button type="button" class="seg-btn" data-mode="login">Log in</button>
+      </div>
+
       <form id="onboarding-form" autocomplete="off">
-        <input id="onboarding-name" type="text" maxlength="24" placeholder="Your name" required />
-        <button type="submit" class="btn btn-primary btn-block">Let's grow 🌿</button>
+        <input id="onboarding-name" type="text" maxlength="24" placeholder="Username" required />
+        <input id="onboarding-pass" type="password" maxlength="64" placeholder="Passcode (min 4 characters)" />
+        <div id="onboarding-err" class="import-msg err"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="onboarding-submit">Create account 🌿</button>
       </form>
+      <button type="button" class="link-btn onboarding-alt" id="offline-link">or just try it solo (no account)</button>
     </div>
   </div>
 
@@ -122,49 +131,61 @@
       <section class="panel" id="panel-buddy">
         <div class="panel-head"><h2>Accountability buddy 🤝</h2></div>
 
-        <div class="card buddy-share">
-          <h3 class="card-title">1 · Share your progress</h3>
-          <p class="muted small">Copy your code and send it to your friend so they can cheer you on.</p>
-          <div class="share-row">
-            <textarea id="my-code" class="code-box" readonly rows="2"></textarea>
-            <button class="btn btn-primary" id="copy-code-btn">Copy code</button>
-          </div>
+        <!-- Shown when running without an account -->
+        <div class="card hidden" id="buddy-offline">
+          <h3 class="card-title">Track a friend, live 🌐</h3>
+          <p class="muted small">When you use an account, you and a friend see each other's progress update in real time — and can send live cheers. You're currently in solo mode.</p>
+          <button class="btn btn-primary" id="buddy-signin-btn">Create an account / log in</button>
         </div>
 
-        <div class="card buddy-import">
-          <h3 class="card-title">2 · Add your buddy's progress</h3>
-          <p class="muted small">Paste the code your friend sent you.</p>
-          <div class="share-row">
-            <textarea id="buddy-code-input" class="code-box" rows="2" placeholder="Paste your buddy's code here…"></textarea>
-            <button class="btn btn-primary" id="import-code-btn">Add buddy</button>
+        <!-- Shown when signed in -->
+        <div id="buddy-online" class="hidden">
+          <div class="card">
+            <h3 class="card-title">Your username</h3>
+            <p class="muted small">Share this with your friend so they can add you. You'll each see the other update live.</p>
+            <div class="share-row">
+              <div class="username-pill" id="my-username">you</div>
+              <button class="btn btn-ghost" id="copy-username-btn">Copy</button>
+            </div>
           </div>
-          <div id="import-msg" class="import-msg"></div>
-        </div>
 
-        <div id="buddy-view" class="hidden">
-          <div class="card buddy-card">
-            <div class="buddy-head">
-              <div class="avatar avatar-lg" id="buddy-avatar">🙂</div>
-              <div>
-                <div class="buddy-name" id="buddy-name">Your buddy</div>
-                <div class="muted small" id="buddy-sub"></div>
+          <div class="card">
+            <h3 class="card-title">Add your buddy</h3>
+            <p class="muted small">Enter your friend's username — they need an account too.</p>
+            <div class="share-row">
+              <input id="buddy-name-input" class="text-input" maxlength="24" placeholder="friend's username" />
+              <button class="btn btn-primary" id="add-buddy-btn">Add</button>
+            </div>
+            <div id="buddy-add-msg" class="import-msg"></div>
+          </div>
+
+          <div id="buddy-view" class="hidden">
+            <div class="card buddy-card">
+              <div class="buddy-head">
+                <div class="avatar avatar-lg" id="buddy-avatar">🙂</div>
+                <div>
+                  <div class="buddy-name" id="buddy-name">Your buddy</div>
+                  <div class="muted small" id="buddy-sub"></div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="remove-buddy-btn">Remove</button>
               </div>
-              <button class="btn btn-ghost btn-sm" id="remove-buddy-btn">Remove</button>
+              <div class="buddy-stats" id="buddy-stats"></div>
+              <div class="buddy-cheer-label">Send a live cheer 💌</div>
+              <div class="buddy-cheer">
+                <button class="btn btn-cheer" data-cheer="👏 Keep going!">👏 Keep going!</button>
+                <button class="btn btn-cheer" data-cheer="🔥 You're on fire!">🔥 On fire!</button>
+                <button class="btn btn-cheer" data-cheer="💪 Proud of you!">💪 Proud of you!</button>
+              </div>
+              <div id="cheer-msg" class="cheer-msg"></div>
             </div>
-            <div class="buddy-stats" id="buddy-stats"></div>
-            <div class="buddy-cheer">
-              <button class="btn btn-cheer" data-cheer="👏 Keep going!">👏 Keep going!</button>
-              <button class="btn btn-cheer" data-cheer="🔥 You're on fire!">🔥 On fire!</button>
-              <button class="btn btn-cheer" data-cheer="💪 Proud of you!">💪 Proud of you!</button>
-            </div>
-            <div id="cheer-msg" class="cheer-msg"></div>
           </div>
         </div>
       </section>
     </main>
 
     <footer class="app-footer">
-      <span>Made for you & your friend · <button class="link-btn" id="reset-btn">reset all data</button></span>
+      <span id="session-status"></span>
+      <span> · <button class="link-btn" id="reset-btn">reset all data</button></span>
     </footer>
   </div>
 
@@ -199,6 +220,7 @@
   <!-- Toasts -->
   <div class="toast-wrap" id="toast-wrap"></div>
 
+  <script src="api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

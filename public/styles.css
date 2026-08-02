@@ -70,6 +70,20 @@ html, body {
   font-size: 1rem;
   margin-bottom: 14px;
 }
+.onboarding-alt { margin-top: 14px; display: inline-block; }
+#onboarding-err:empty { display: none; }
+#onboarding-err { text-align: left; margin: -4px 0 10px; }
+
+/* Segmented control (signup / login) */
+.seg {
+  display: flex; gap: 4px; background: var(--bg-soft); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px; margin-bottom: 18px;
+}
+.seg-btn {
+  flex: 1; border: none; background: transparent; color: var(--muted);
+  padding: 9px; border-radius: 999px; font-weight: 600; cursor: pointer; font-size: 0.9rem;
+}
+.seg-btn.active { background: var(--card-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
 
 /* ---------- App shell ---------- */
 .app {
@@ -351,7 +365,26 @@ html, body {
 .buddy-stat .bn { font-size: 1.4rem; font-weight: 800; }
 .buddy-stat .bl { color: var(--muted); font-size: 0.75rem; }
 .buddy-cheer { display: flex; gap: 8px; flex-wrap: wrap; }
+.buddy-cheer-label { color: var(--muted); font-size: 0.85rem; margin-bottom: 8px; }
 .cheer-msg { margin-top: 12px; color: var(--brand); font-weight: 600; min-height: 1em; }
+
+/* Username pill + text input + presence dot */
+.username-pill {
+  flex: 1; display: flex; align-items: center; padding: 10px 14px;
+  background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 700; color: var(--brand);
+}
+.text-input {
+  flex: 1; padding: 10px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: var(--bg-soft); color: var(--text);
+  font-size: 0.95rem; font-family: var(--font);
+}
+.dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted); margin-right: 4px; vertical-align: middle;
+}
+.dot.online { background: var(--brand); box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2); }
+#session-status b { color: var(--text); }
 
 /* ---------- Footer ---------- */
 .app-footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 30px; }

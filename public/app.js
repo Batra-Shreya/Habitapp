@@ -61,8 +61,41 @@
     }
   }
 
+  // ---------- Session (online = synced to backend, offline = local only) ----------
+  const session = { mode: "offline", name: null }; // mode: "offline" | "online"
+  const API = window.HabitatAPI;
+  let syncTimer = null;
+
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+    if (session.mode === "online") {
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(pushState, 400); // debounce rapid changes into one sync
+    }
+  }
+
+  async function pushState() {
+    if (session.mode !== "online") return;
+    const payload = Object.assign({}, state);
+    delete payload.buddy; // the buddy snapshot is their data, not part of ours
+    try {
+      await API.putState(payload, mySnapshot());
+    } catch (err) {
+      if (err.status === 401) fallToOffline(); // token expired
+    }
+  }
+
+  function fallToOffline() {
+    session.mode = "offline";
+    API.logout();
+    renderSessionStatus();
+    renderBuddy();
+    toast("Signed out — now in solo mode.");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
   // ---------- Date helpers ----------
@@ -119,20 +152,87 @@
   const $$ = sel => Array.from(document.querySelectorAll(sel));
 
   // ---------- Boot ----------
-  function boot() {
-    if (!state.user.name) {
-      $("#onboarding").classList.remove("hidden");
-      $("#onboarding").setAttribute("aria-hidden", "false");
-    } else {
-      startApp();
-    }
+  async function boot() {
     wireGlobalEvents();
+
+    const serverUp = await API.health();
+
+    // 1. Signed-in session? Try to resume it.
+    if (serverUp && API.hasToken()) {
+      try {
+        const { state: srv } = await API.getState();
+        session.mode = "online";
+        if (srv) {
+          state = Object.assign(defaultState(), srv);
+          state.buddy = null; // refreshed live below
+        }
+        session.name = state.user.name;
+        save();                 // migrate local up (if server was empty) / persist
+        startApp();
+        startLiveSync();
+        return;
+      } catch (err) {
+        API.logout();           // token invalid — fall through to onboarding/offline
+      }
+    }
+
+    // 2. Previously used offline with a local profile.
+    if (state.user.name && !API.hasToken()) {
+      session.mode = "offline";
+      startApp();
+      return;
+    }
+
+    // 3. Fresh start — show onboarding.
+    showOnboarding(serverUp);
   }
 
   function startApp() {
     $("#onboarding").classList.add("hidden");
     $("#app").classList.remove("hidden");
+    renderSessionStatus();
     renderAll();
+  }
+
+  function showOnboarding(serverUp) {
+    $("#app").classList.add("hidden");
+    const ob = $("#onboarding");
+    ob.classList.remove("hidden");
+    ob.setAttribute("aria-hidden", "false");
+    $("#onboarding-name").value = state.user.name || "";
+
+    if (!serverUp) {
+      // No backend reachable — offer solo mode only.
+      $("#auth-seg").classList.add("hidden");
+      $("#onboarding-pass").classList.add("hidden");
+      $("#offline-link").classList.add("hidden");
+      $("#onboarding-submit").textContent = "Start tracking 🌿";
+      $("#onboarding-sub").textContent = "Backend offline — you can still track your own goals here.";
+      authMode = "offline";
+    } else {
+      $("#auth-seg").classList.remove("hidden");
+      $("#onboarding-pass").classList.remove("hidden");
+      $("#offline-link").classList.remove("hidden");
+      setAuthMode("signup");
+    }
+    setTimeout(() => $("#onboarding-name").focus(), 50);
+  }
+
+  function startLiveSync() {
+    API.connectEvents({
+      buddy: snap => { state.buddy = snap; renderBuddy(); },
+      cheer: c => receiveCheer(c),
+      error: () => {}, // EventSource reconnects automatically
+    });
+    refreshBuddy();
+  }
+
+  async function refreshBuddy() {
+    try {
+      const { buddy } = await API.getBuddy();
+      state.buddy = buddy;
+      renderBuddy();
+    } catch {}
   }
 
   // ---------- Rendering ----------
@@ -295,22 +395,48 @@
   }
 
   function renderBuddy() {
-    $("#my-code").value = encodeSnapshot(mySnapshot());
+    const online = session.mode === "online";
+    $("#buddy-offline").classList.toggle("hidden", online);
+    $("#buddy-online").classList.toggle("hidden", !online);
+    if (!online) return;
+
+    $("#my-username").textContent = state.user.name;
+
     const view = $("#buddy-view");
-    if (!state.buddy) { view.classList.add("hidden"); return; }
+    const b = state.buddy;
+    if (!b) { view.classList.add("hidden"); return; }
     view.classList.remove("hidden");
 
-    const b = state.buddy;
+    const lvl = levelFromPoints(b.points);
     $("#buddy-avatar").textContent = b.avatar || "🙂";
     $("#buddy-name").textContent = b.name || "Your buddy";
-    $("#buddy-sub").textContent = `Level ${levelFromPoints(b.points)} · ${levelTitle(levelFromPoints(b.points))}`;
+    const presence = b.online
+      ? `<span class="dot online"></span>online now`
+      : `<span class="dot"></span>offline`;
+    $("#buddy-sub").innerHTML = `Level ${lvl} · ${levelTitle(lvl)} · ${presence}`;
     $("#buddy-stats").innerHTML = `
       <div class="buddy-stat"><div class="bn">💎 ${b.points}</div><div class="bl">points</div></div>
       <div class="buddy-stat"><div class="bn">🔥 ${b.bestStreak || 0}</div><div class="bl">best streak</div></div>
       <div class="buddy-stat"><div class="bn">✅ ${b.totalDone || 0}</div><div class="bl">completions</div></div>`;
   }
 
-  // ---------- Snapshots (buddy sharing) ----------
+  function renderSessionStatus() {
+    const el = $("#session-status");
+    if (!el) return;
+    if (session.mode === "online") {
+      el.innerHTML = `🌐 Synced as <b>${escapeHtml(state.user.name)}</b> · <button class="link-btn" id="logout-btn">log out</button>`;
+      const lo = $("#logout-btn");
+      if (lo) lo.addEventListener("click", () => {
+        API.logout();
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      });
+    } else {
+      el.textContent = "📴 Solo mode";
+    }
+  }
+
+  // ---------- My public snapshot (what a buddy sees) ----------
   function mySnapshot() {
     return {
       name: state.user.name,
@@ -322,14 +448,13 @@
     };
   }
 
-  function encodeSnapshot(snap) {
-    try { return btoa(unescape(encodeURIComponent(JSON.stringify(snap)))); }
-    catch { return ""; }
-  }
-  function decodeSnapshot(code) {
-    const snap = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
-    if (typeof snap.name !== "string" || typeof snap.points !== "number") throw new Error("bad");
-    return snap;
+  function receiveCheer(c) {
+    $("#celebrate-msg").innerHTML =
+      `${escapeHtml(c.message)}<br><span style="font-size:0.85rem;color:var(--muted)">from ${escapeHtml(c.from)}</span>`;
+    $("#celebrate").classList.remove("hidden");
+    runConfetti();
+    setTimeout(() => $("#celebrate").classList.add("hidden"), 2200);
+    toast(`💌 ${c.from}: ${c.message}`, "gold");
   }
 
   // ---------- Actions ----------
@@ -461,6 +586,59 @@
     }, 2600);
   }
 
+  // ---------- Onboarding auth mode ----------
+  let authMode = "signup"; // "signup" | "login" | "offline"
+  function setAuthMode(mode) {
+    authMode = mode;
+    $$("#auth-seg .seg-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    $("#onboarding-submit").textContent = mode === "login" ? "Log in 🌿" : "Create account 🌿";
+    $("#onboarding-err").textContent = "";
+  }
+
+  function seedStarters() {
+    if (state.habits.length > 0) return;
+    addHabit("Drink water 💧", "💧");
+    addHabit("Move for 20 min", "🏃");
+  }
+
+  async function submitOnboarding() {
+    const name = $("#onboarding-name").value.trim();
+    const pass = $("#onboarding-pass").value;
+    const err = $("#onboarding-err");
+    err.textContent = "";
+    if (!name) return;
+
+    if (authMode === "offline") {
+      session.mode = "offline";
+      state.user.name = name;
+      save();
+      startApp();
+      seedStarters();
+      return;
+    }
+
+    try {
+      const res = authMode === "signup"
+        ? await API.signup(name, pass)
+        : await API.login(name, pass);
+
+      session.mode = "online";
+      session.name = res.name;
+      state.user.name = res.name;
+
+      if (res.state) {
+        state = Object.assign(defaultState(), res.state); // returning user: server wins
+        state.buddy = null;
+      }
+      save();               // new account: migrates any local goals up
+      startApp();
+      startLiveSync();
+      if (authMode === "signup") seedStarters();
+    } catch (ex) {
+      err.textContent = ex.message || "Something went wrong. Try again.";
+    }
+  }
+
   // ---------- Modal ----------
   let editingEmoji = "💧";
 
@@ -494,17 +672,17 @@
 
   // ---------- Event wiring ----------
   function wireGlobalEvents() {
-    // Onboarding
+    // Onboarding: signup / login segmented control
+    $$("#auth-seg .seg-btn").forEach(b => {
+      b.addEventListener("click", () => setAuthMode(b.dataset.mode));
+    });
     $("#onboarding-form").addEventListener("submit", e => {
       e.preventDefault();
-      const name = $("#onboarding-name").value.trim();
-      if (!name) return;
-      state.user.name = name;
-      save();
-      startApp();
-      // Seed a couple of starter goals so it doesn't feel empty
-      addHabit("Drink water 💧", "💧");
-      addHabit("Move for 20 min", "🏃");
+      submitOnboarding();
+    });
+    $("#offline-link").addEventListener("click", () => {
+      authMode = "offline";
+      submitOnboarding();
     });
 
     // Tabs
@@ -532,65 +710,83 @@
       closeHabitModal();
     });
 
-    // Buddy — copy
-    $("#copy-code-btn").addEventListener("click", async () => {
-      const code = $("#my-code").value;
-      try {
-        await navigator.clipboard.writeText(code);
-        toast("📋 Code copied — send it to your friend!");
-      } catch {
-        $("#my-code").select();
-        document.execCommand("copy");
-        toast("📋 Code copied!");
-      }
+    // Buddy — offline notice: jump to sign-in
+    $("#buddy-signin-btn").addEventListener("click", async () => {
+      const up = await API.health();
+      if (!up) { toast("Backend isn't running — start it with npm start"); return; }
+      setAuthMode("signup");
+      showOnboarding(true);
     });
 
-    // Buddy — import
-    $("#import-code-btn").addEventListener("click", () => {
-      const input = $("#buddy-code-input").value.trim();
-      const msg = $("#import-msg");
-      if (!input) { msg.textContent = "Paste a code first."; msg.className = "import-msg err"; return; }
+    // Buddy — copy my username
+    $("#copy-username-btn").addEventListener("click", async () => {
       try {
-        const snap = decodeSnapshot(input);
-        state.buddy = snap;
-        save();
-        checkBadges();
-        renderAll();
-        msg.textContent = `Added ${snap.name}! 🎉`;
-        msg.className = "import-msg ok";
-        $("#buddy-code-input").value = "";
-      } catch {
-        msg.textContent = "Hmm, that code doesn't look right. Double-check it.";
-        msg.className = "import-msg err";
-      }
+        await navigator.clipboard.writeText(state.user.name);
+        toast("📋 Username copied — send it to your friend!");
+      } catch { toast("📋 Your username: " + state.user.name); }
     });
 
-    $("#remove-buddy-btn").addEventListener("click", () => {
+    // Buddy — add by username
+    $("#add-buddy-btn").addEventListener("click", addBuddy);
+    $("#buddy-name-input").addEventListener("keydown", e => { if (e.key === "Enter") addBuddy(); });
+
+    // Buddy — remove
+    $("#remove-buddy-btn").addEventListener("click", async () => {
+      try { await API.removeBuddy(); } catch {}
       state.buddy = null;
-      save();
-      renderAll();
+      renderBuddy();
     });
 
-    // Cheers
+    // Live cheers
     $$(".btn-cheer").forEach(b => {
-      b.addEventListener("click", () => {
+      b.addEventListener("click", async () => {
+        if (session.mode !== "online" || !state.buddy) return;
         const cheer = b.dataset.cheer;
-        $("#cheer-msg").textContent = `Sent "${cheer}" to ${state.buddy?.name || "your buddy"}! Share it with them 💌`;
-        runConfetti();
-        $("#celebrate").classList.remove("hidden");
-        $("#celebrate-msg").textContent = cheer;
-        setTimeout(() => $("#celebrate").classList.add("hidden"), 1200);
+        try {
+          const r = await API.cheer(cheer);
+          $("#cheer-msg").textContent = r.delivered
+            ? `Sent to ${state.buddy.name} — they saw it live! 💌`
+            : `Sent to ${state.buddy.name} 💌 they'll see it next time they're online`;
+          $("#celebrate-msg").textContent = cheer;
+          $("#celebrate").classList.remove("hidden");
+          runConfetti();
+          setTimeout(() => $("#celebrate").classList.add("hidden"), 1000);
+        } catch (e) {
+          $("#cheer-msg").textContent = e.message || "Couldn't send that cheer.";
+        }
       });
     });
 
     // Reset
     $("#reset-btn").addEventListener("click", () => {
-      if (confirm("Reset everything? This clears all your goals, points and buddy.")) {
+      if (confirm("Reset everything? This clears your local data on this device.")) {
+        API.logout();
         localStorage.removeItem(STORAGE_KEY);
         state = defaultState();
         location.reload();
       }
     });
+  }
+
+  async function addBuddy() {
+    const name = $("#buddy-name-input").value.trim();
+    const msg = $("#buddy-add-msg");
+    if (!name) { msg.textContent = "Enter a username."; msg.className = "import-msg err"; return; }
+    try {
+      const { buddy } = await API.addBuddy(name);
+      state.buddy = buddy;
+      checkBadges();          // unlocks "Better Together"
+      save();                 // persist the new badge (and sync it)
+      renderBuddy();
+      renderRewards();
+      msg.textContent = `Added ${buddy.name}! 🎉 Ask them to add you back so you both see each other.`;
+      msg.className = "import-msg ok";
+      $("#buddy-name-input").value = "";
+      startLiveSync();        // reconnect so their live updates flow in
+    } catch (e) {
+      msg.textContent = e.message || "Couldn't add that buddy.";
+      msg.className = "import-msg err";
+    }
   }
 
   // ---------- Go ----------
