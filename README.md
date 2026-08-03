@@ -80,16 +80,48 @@ If you open the app without a running backend (e.g. `public/index.html` straight
 drops into **solo mode**: you can still track your own goals and earn rewards, saved in your
 browser's `localStorage`. The live-buddy features simply light up once you're on an account.
 
-## Playing together over the internet
+## Deploy from your phone (no terminal needed)
 
-Local `npm start` is perfect for one machine or a home network. For you and a friend on
-different networks, run the server somewhere you both can reach:
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Batra-Shreya/Habitapp)
 
-- **Quick share:** run `npm start`, then expose it with a tunnel like
-  `npx localtunnel --port 3000` or `ngrok http 3000`, and send your friend the URL.
-- **Always-on:** deploy `server/` to any Node host (Render, Railway, Fly.io, a small VPS).
-  It's a single process; point it at a persistent disk for `server/db.json`.
-  Configure the port with the `PORT` env var and the data file with `HABITAT_DB`.
+You can put Habitat online entirely from a phone browser:
+
+1. Tap **Deploy to Render** above (or go to [render.com](https://render.com) → **New +** →
+   **Blueprint** → pick this repo → **Apply**). Sign in with GitHub when asked.
+2. Render reads `render.yaml`, installs, and runs `npm start` for you. Wait for it to say
+   **Live** (first build takes a minute or two).
+3. Tap the URL Render gives you, e.g. `https://habitat-xxxx.onrender.com` — that's your app.
+
+**Test it with your friend:**
+- Open the URL, **create an account** (username + passcode).
+- Send your friend the **same URL** and your **username**.
+- They create their own account, and you each add the other under the **🤝 Buddy** tab.
+- Check off a habit and watch it update on the other's screen live. 🎉
+
+**Test it by yourself first** (handy on one phone): open the URL in your normal browser and
+again in a **private/incognito** tab, sign up as two different users, add each other, and
+toggle a habit — you'll see the other tab update instantly.
+
+> **Free-tier notes:** Render's free service **sleeps after ~15 min idle**, so the first visit
+> after a nap takes ~30s to wake — totally fine for trying it out. Also, the free tier's disk
+> is temporary, so accounts reset if the service restarts. To keep data permanently, add a
+> Render **Disk**, mount it at e.g. `/data`, and set the env var `HABITAT_DB=/data/db.json`.
+
+Other one-tap-ish hosts that also work from a phone: **Railway** and **Glitch** (import this
+GitHub repo; both run `npm start` and hand you a URL).
+
+## Playing together from a computer
+
+If you're at a laptop instead, `npm start` runs it locally, and for a quick share with a
+friend you can tunnel it without deploying:
+
+```bash
+npm start
+npx localtunnel --port 3000    # or: ngrok http 3000
+```
+
+The server is a single process. Configure the port with `PORT` and the data file with
+`HABITAT_DB`.
 
 ## Your data
 

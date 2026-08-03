@@ -1,0 +1,14 @@
+# One-click deploy config for Render (https://render.com).
+# In the Render dashboard: New + → Blueprint → pick this repo → Apply.
+# Or tap the "Deploy to Render" button in the README.
+services:
+  - type: web
+    name: habitat
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
