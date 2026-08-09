@@ -316,3 +316,16 @@ server.listen(PORT, () => {
   console.log(`   Data file: ${store.DB_PATH}`);
   console.log(`   Open the URL in two browsers to see live buddy sync.\n`);
 });
+
+// Persist any pending write before the process goes away (Render sends SIGTERM
+// on redeploy/scale-down), so no one loses their last change.
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  store.flushSync();
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 2000).unref(); // don't hang on open SSE streams
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

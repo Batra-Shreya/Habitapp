@@ -1,14 +1,26 @@
 # One-click deploy config for Render (https://render.com).
 # In the Render dashboard: New + → Blueprint → pick this repo → Apply.
-# Or tap the "Deploy to Render" button in the README.
+#
+# NOTE ON DATA PERSISTENCE:
+# The disk below is what keeps accounts/progress from being wiped on restart.
+# Render disks require a paid instance (Starter, ~$7/mo) — the free plan cannot
+# mount a disk. If you want to stay on the free plan for now, delete the `plan`,
+# `disk`, and the HABITAT_DB env var below; data will then reset on restart.
 services:
   - type: web
     name: habitat
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Store the database on the mounted persistent disk.
+      - key: HABITAT_DB
+        value: /data/habitat/db.json
+    disk:
+      name: habitat-data
+      mountPath: /data/habitat
+      sizeGB: 1

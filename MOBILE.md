@@ -116,11 +116,15 @@ can validate demand *before* spending much by sharing the installable PWA link.
 - ✅ PWA manifest, service worker, and generated app icons
 - ✅ App is installable from the browser today ("Add to Home screen")
 - ✅ Server serves the new assets with correct types
+- ✅ **Persistent data** — the database survives restarts/redeploys: it lives on a
+  mounted disk (see `render.yaml`) and the server flushes on shutdown so no change
+  is lost. *(Requires Render's Starter plan, ~$7/mo, since disks aren't on free.)*
+- ✅ **Privacy policy** — served at `/privacy.html` and linked from the app footer.
+  Reachable publicly at `https://<your-app>.onrender.com/privacy.html` — that's the
+  URL to paste into the Play Console. *(Remember to fill in your contact email in it.)*
 
 **Next, when you're ready (tell me which and I'll do it):**
-- [ ] Persistent database so no one loses data
 - [ ] Security hardening (rate limiting, buddy requests, stronger passcodes)
-- [ ] A privacy-policy page (required by Google)
 - [ ] Capacitor Android project + push-notification reminders
 - [ ] A premium/subscription tier for earning
 

@@ -27,20 +27,32 @@ function loadFromDisk() {
   return db;
 }
 
+// Atomic write: write a temp file then rename over the real one, so a crash
+// mid-write can never corrupt the database. Creates the directory if needed
+// (e.g. a freshly mounted persistent disk).
+function writeNow() {
+  try {
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    const tmp = DB_PATH + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+    fs.renameSync(tmp, DB_PATH);
+  } catch (err) {
+    console.error("[store] failed to persist:", err.message);
+  }
+}
+
 let writeTimer = null;
 function persist() {
-  // Debounced atomic write: write to a temp file then rename.
+  // Debounce bursts of changes into a single write.
   if (writeTimer) return;
-  writeTimer = setTimeout(() => {
-    writeTimer = null;
-    try {
-      const tmp = DB_PATH + ".tmp";
-      fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
-      fs.renameSync(tmp, DB_PATH);
-    } catch (err) {
-      console.error("[store] failed to persist:", err.message);
-    }
-  }, 120);
+  writeTimer = setTimeout(() => { writeTimer = null; writeNow(); }, 120);
+}
+
+// Write immediately, cancelling any pending debounced write. Called on shutdown
+// so an in-flight change survives a redeploy/restart.
+function flushSync() {
+  if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; }
+  writeNow();
 }
 
 function key(name) {
@@ -82,4 +94,5 @@ module.exports = {
   },
 
   persist,
+  flushSync,
 };
